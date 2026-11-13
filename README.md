@@ -95,7 +95,7 @@ Costs use API list prices from [`token-monitor/pricing.json`](token-monitor/pric
 ## Development
 
 ```bash
-node --test token-monitor/test/                 # unit + HTTP security tests
+node --test token-monitor/test/*.test.js        # unit + HTTP security tests
 python token-monitor/export_excel.py out.xlsx   # needs: pip install openpyxl
 ```
 

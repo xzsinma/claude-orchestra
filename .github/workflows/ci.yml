@@ -20,7 +20,7 @@ jobs:
           python-version: '3.12'
       - run: pip install openpyxl==3.1.5
       - name: Unit tests
-        run: node --test token-monitor/test/
+        run: node --test token-monitor/test/*.test.js
       - name: Excel export from demo data
         working-directory: token-monitor
         run: |
