@@ -1,0 +1,15 @@
+# Planning notes and personal data never go to the repository
+BORRADOR.md
+DRAFT.md
+calibration.json
+.env
+*.xlsx
+out/
+token-monitor/out/
+
+# Tooling
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db

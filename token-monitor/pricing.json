@@ -1,0 +1,11 @@
+{
+  "verifiedAt": "2026-11-13",
+  "source": "Anthropic API list prices, USD per million tokens. Check https://www.anthropic.com/pricing and update this file when they change.",
+  "cacheWriteMultiplier": { "5m": 1.25, "1h": 2 },
+  "models": {
+    "Opus":   { "input": 4,    "output": 20,   "cacheRead": 0.20 },
+    "Sonnet": { "input": 2,    "output": 10,   "cacheRead": 0.10 },
+    "Haiku":  { "input": 0.10, "output": 0.50, "cacheRead": 0.01, "tierThreshold": 100000, "tierMultiplier": 5 },
+    "Fable":  { "input": 8,    "output": 40,   "cacheRead": 0.20 }
+  }
+}

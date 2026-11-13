@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.11.0'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install openpyxl==3.1.5
+      - name: Unit tests
+        run: node --test token-monitor/test/
+      - name: Excel export from demo data
+        working-directory: token-monitor
+        run: |
+          node demo/generate.js "$RUNNER_TEMP/demo"
+          TOKEN_MONITOR_ROOT="$RUNNER_TEMP/demo" TOKEN_MONITOR_DATA="$RUNNER_TEMP/state" \
+            python -I export_excel.py "$RUNNER_TEMP/out/token-usage.xlsx"
+          test -s "$RUNNER_TEMP/out/token-usage.xlsx"
+      - name: Installer dry run
+        run: CLAUDE_DIR="$RUNNER_TEMP/claude" sh install.sh && test -f "$RUNNER_TEMP/claude/agents/junior-haiku.md"
+      - name: No personal data in the repository
+        run: |
+          if git grep -nIiE '(C:\\Users\\|/Users/[a-z]|@gmail\.com|calibration\.json":)' -- ':!.github/workflows/ci.yml' ':!.gitignore'; then
+            echo "Found something that looks personal"; exit 1
+          fi
+
+  docker:
+    runs-on: ubuntu-24.04
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.11.0'
+      - name: Build image
+        run: docker build -t token-monitor:ci token-monitor
+      - name: Run hardened container on demo data
+        run: |
+          node token-monitor/demo/generate.js "$RUNNER_TEMP/demo"
+          mkdir -p "$RUNNER_TEMP/out" && chmod 777 "$RUNNER_TEMP/out"
+          docker run -d --name tm \
+            --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges:true \
+            --memory 256m --pids-limit 100 \
+            -v "$RUNNER_TEMP/demo:/data/projects:ro" -v "$RUNNER_TEMP/out:/out" -v tm-state:/state \
+            -p 127.0.0.1:4317:4317 token-monitor:ci
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:4317/healthz && break; sleep 1; done
+      - name: Smoke and security checks
+        run: |
+          set -e
+          curl -fs http://127.0.0.1:4317/ | grep -q "Token Monitor"
+          curl -fs "http://127.0.0.1:4317/api/stats?range=all" | grep -q '"junior-haiku"'
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: evil.example' http://127.0.0.1:4317/)" = 403
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:4317/api/export)" = 403
+          curl -fs -X POST -H 'X-Token-Monitor: 1' http://127.0.0.1:4317/api/export | grep -q '"ok":true'
+          test -s "$RUNNER_TEMP/out/token-usage.xlsx"
+          test "$(docker exec tm id -u)" != "0"
+          test "$(docker inspect -f '{{.HostConfig.ReadonlyRootfs}}' tm)" = "true"
+          docker inspect -f '{{.HostConfig.CapDrop}}' tm | grep -q ALL
+          ! docker exec tm sh -c 'touch /app/x' 2>/dev/null
+          echo "All container checks passed"
+      - name: Container logs
+        if: always()
+        run: docker logs tm || true

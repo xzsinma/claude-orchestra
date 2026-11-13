@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Token Monitor</title>
+<style>
+:root{
+  --bg:#f6f5f2;--card:#fff;--ink:#1d1c1a;--mut:#6f6b64;--line:#e6e3dc;--track:#efece6;
+  --opus:#7c5cff;--haiku:#14a38b;--fable:#e08a1e;--sonnet:#2f7de1;--other:#9a958c;--live:#1fa45a;--warn:#c4691b;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#141413;--card:#1e1d1b;--ink:#ecebe7;--mut:#9c978e;--line:#2e2c29;--track:#2a2926;
+  --opus:#9b82ff;--haiku:#2cc4a8;--fable:#f0a443;--sonnet:#5b9bf0;--other:#7d786f;--warn:#f0a443;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 40px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:18px}
+h1{font-size:20px;margin:0;letter-spacing:-.01em}
+.status{display:flex;align-items:center;gap:8px;color:var(--mut);font-size:13px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--other)}
+.dot.on{background:var(--live)}
+.spacer{flex:1}
+.btn{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 12px;cursor:pointer}
+.btn:disabled{opacity:.6;cursor:wait}
+.tabs{display:flex;background:var(--track);border-radius:9px;padding:3px}
+.tabs button{border:0;background:none;color:var(--mut);padding:6px 12px;border-radius:7px;font:inherit;cursor:pointer}
+.tabs button.act{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.grid{display:grid;gap:12px}
+.kpis{grid-template-columns:repeat(4,1fr);margin-bottom:12px}
+.two{grid-template-columns:1fr 1fr;margin-bottom:12px}
+@media (max-width:760px){.kpis{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+.card h2{font-size:13px;font-weight:600;margin:0 0 12px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+.kpi .v{font-size:26px;font-weight:650;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.kpi .l{color:var(--mut);font-size:12.5px}
+.s{color:var(--mut);font-size:12px;margin-top:2px}
+.row{display:grid;grid-template-columns:minmax(150px,45%) 1fr 64px;gap:10px;align-items:center;margin:10px 0}
+.row .n{font-weight:550;min-width:0}
+.row .n small{display:block;color:var(--mut);font-weight:400;font-size:11.5px;line-height:1.35}
+.warn{color:var(--warn)}
+.bar{height:10px;background:var(--track);border-radius:5px;overflow:hidden}
+.bar i{display:block;height:100%}
+.row .x{text-align:right;font-variant-numeric:tabular-nums}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--mut);margin-bottom:8px}
+.legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;background:var(--c)}
+#chart{width:100%;height:220px;display:block}
+#chart text{fill:var(--mut);font-size:10.5px}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:7px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--mut);font-weight:500;font-size:12px}
+th:first-child,td:first-child{text-align:left;white-space:normal}
+td:first-child small{display:block;color:var(--mut);font-size:11.5px}
+.tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:5px;background:var(--track);color:var(--mut);margin:2px 3px 0 0}
+.scroll{overflow-x:auto}
+.empty{color:var(--mut);padding:18px 0;text-align:center}
+.meter{height:12px;background:var(--track);border-radius:6px;overflow:hidden;margin:8px 0 4px}
+.meter i{display:block;height:100%;background:var(--opus)}
+.calf{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-top:10px;font-size:12.5px;color:var(--mut)}
+.calf label{display:flex;flex-direction:column;gap:3px}
+.calf input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:5px 7px}
+summary{cursor:pointer;color:var(--mut);font-size:12.5px}
+.note{color:var(--mut);font-size:12px;margin-top:14px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Token Monitor</h1>
+    <div class="status"><span class="dot" id="dot"></span><span id="st">Connecting…</span></div>
+    <div class="spacer"></div>
+    <button class="btn" id="xls" title="Rebuild the Excel tracking workbook">Export Excel</button>
+    <div class="tabs" id="tabs">
+      <button data-r="today" class="act">Today</button><button data-r="7d">7 days</button><button data-r="all">All</button>
+    </div>
+  </header>
+
+  <section class="grid kpis">
+    <div class="card kpi"><div class="l">Usage</div><div class="v" id="k-total">–</div><div class="s">input + output + cache writes</div></div>
+    <div class="card kpi"><div class="l">Output</div><div class="v" id="k-out">–</div><div class="s" id="k-out-s"></div></div>
+    <div class="card kpi"><div class="l">Cache reads</div><div class="v" id="k-cr">–</div><div class="s">reused context, much cheaper</div></div>
+    <div class="card kpi"><div class="l">Equivalent cost</div><div class="v" id="k-cost">–</div><div class="s" id="k-cost-s"></div><div class="s" id="k-last"></div></div>
+  </section>
+
+  <section class="card" style="margin-bottom:12px">
+    <h2>Plan limit (estimate)</h2>
+    <div id="limit-body"></div>
+    <details style="margin-top:10px"><summary>Calibrate with the usage card of the Claude app</summary>
+      <form id="calf" class="calf">
+        <label>% used (5 h) <input name="h5Pct" type="number" min="1" max="100" required></label>
+        <label>Resets at <input name="h5Reset" type="datetime-local" required></label>
+        <label>% used (weekly) <input name="weekPct" type="number" min="1" max="100"></label>
+        <label>Resets at <input name="weekReset" type="datetime-local"></label>
+        <button class="btn">Calibrate</button>
+      </form>
+    </details>
+  </section>
+
+  <section class="grid two">
+    <div class="card"><h2>By agent</h2><div id="agents"></div></div>
+    <div class="card"><h2>By model</h2><div id="models"></div></div>
+  </section>
+
+  <section class="card" style="margin-bottom:12px">
+    <h2 id="chart-t">Usage over time</h2>
+    <div class="legend" id="legend"></div>
+    <svg id="chart" role="img" aria-label="Token usage over time"></svg>
+  </section>
+
+  <section class="card">
+    <h2>Sessions</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Session</th><th>Usage</th><th>Output</th><th>Cache reads</th><th>Cost</th><th>% 5 h</th><th>% week</th></tr></thead>
+      <tbody id="sessions"></tbody>
+    </table></div>
+  </section>
+  <p class="note" id="foot">Read from local Claude Code transcripts; nothing leaves this computer. Costs use public API list prices.</p>
+</main>
+<script>
+const COLORS = {Opus:'var(--opus)',Haiku:'var(--haiku)',Fable:'var(--fable)',Sonnet:'var(--sonnet)'};
+const col = f => COLORS[f] || 'var(--other)';
+const AGENT_LABEL = {'main':'Main session'};
+const AGENT_ROLE = {'main':'orchestrator','junior-haiku':'junior','senior-opus':'senior'};
+const ORDER = ['main','senior-opus','junior-haiku'];
+let range = (()=>{try{return localStorage.getItem('tm-range')||'today'}catch{return 'today'}})();
+let CAL = null, last = null;
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function fmt(n){
+  if(n>=1e9) return (n/1e9).toFixed(2)+' B';
+  if(n>=1e6) return (n/1e6).toFixed(n>=1e7?1:2)+' M';
+  if(n>=1e3) return (n/1e3).toFixed(n>=1e4?0:1)+' k';
+  return String(n);
+}
+const used = a => a.inp + a.out + a.cw;
+const money = c => '$' + (c >= 100 ? c.toFixed(0) : c >= 1 ? c.toFixed(2) : c.toFixed(3));
+const pctTxt = p => p == null ? '–' : p < 0.1 ? '<0.1%' : p.toFixed(p < 10 ? 1 : 0)+'%';
+// A share of the 5-hour limit only makes sense for "today"; longer ranges are shown against the weekly limit.
+const p5raw = c => CAL && CAL.h5 ? c * CAL.h5.pctPerDollar : null;
+const p5 = c => range === 'today' ? p5raw(c) : null;
+const pW = c => CAL && CAL.week ? c * CAL.week.pctPerDollar : null;
+const costLine = c => money(c) + (p5(c) != null ? ' · ≈'+pctTxt(p5(c))+' of 5 h' : pW(c) != null ? ' · ≈'+pctTxt(pW(c))+' weekly' : '');
+function ago(ts){
+  if(!ts) return 'no activity';
+  const s = Math.round((Date.now()-ts)/1000);
+  if(s<60) return 'just now'; if(s<3600) return Math.round(s/60)+' min ago';
+  if(s<86400) return Math.round(s/3600)+' h ago'; return new Date(ts).toLocaleDateString();
+}
+const when = iso => new Date(iso).toLocaleString('en', {weekday:'short',hour:'2-digit',minute:'2-digit'});
+
+function rows(el, entries, labelFn){
+  if(!entries.length){ el.innerHTML='<div class="empty">No data in this range</div>'; return; }
+  const max = Math.max(...entries.map(([,v])=>used(v)),1);
+  el.innerHTML = entries.map(([k,v])=>{
+    const [name,sub,color] = labelFn(k,v);
+    return `<div class="row"><div class="n">${esc(name)}<small>${sub}</small></div>
+      <div class="bar" title="${used(v).toLocaleString()} tokens"><i style="width:${used(v)/max*100}%;background:${color}"></i></div><div class="x">${fmt(used(v))}</div></div>`;
+  }).join('');
+}
+
+function chart(d){
+  const svg = $('chart'), W = svg.clientWidth || 600, H = 220, pl = 44, pb = 22, pt = 6;
+  const fams = [...new Set(d.series.flatMap(p=>Object.keys(p).filter(k=>k!=='t')))];
+  $('legend').innerHTML = fams.map(f=>`<span style="--c:${col(f)}">${esc(f)}</span>`).join('');
+  $('chart-t').textContent = d.hourly ? 'Usage per hour (today)' : 'Usage per day';
+  svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  if(!d.series.length){ svg.innerHTML=`<text x="${W/2}" y="${H/2}" text-anchor="middle">No data in this range</text>`; return; }
+  const map = new Map(d.series.map(p=>[p.t,p])), pts = [];
+  for(let t=d.series[0].t; t<=d.series[d.series.length-1].t && pts.length<400; ){
+    pts.push(map.get(t)||{t}); const n=new Date(t); d.hourly?n.setHours(n.getHours()+1):n.setDate(n.getDate()+1); t=n.getTime();
+  }
+  const tot = p => fams.reduce((s,f)=>s+(p[f]||0),0), max = Math.max(...pts.map(tot),1);
+  const cw = (W-pl-4)/pts.length, bw = Math.max(2,Math.min(28,cw*0.72));
+  let g = '';
+  for(let i=0;i<=3;i++){ const y = pt+(H-pt-pb)*(1-i/3);
+    g+=`<line x1="${pl}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl-6}" y="${y+3}" text-anchor="end">${fmt(max*i/3)}</text>`; }
+  const every = Math.ceil(pts.length/Math.max(1,Math.floor((W-pl)/52)));
+  pts.forEach((p,i)=>{
+    const x = pl+i*cw+(cw-bw)/2; let y = H-pb;
+    for(const f of fams){ const v=p[f]||0; if(!v) continue; const h=v/max*(H-pt-pb); y-=h;
+      g+=`<rect x="${x}" y="${y}" width="${bw}" height="${h}" rx="1.5" fill="${col(f)}"><title>${esc(f)}: ${v.toLocaleString()}</title></rect>`; }
+    if(i%every===0){ const dt=new Date(p.t);
+      g+=`<text x="${x+bw/2}" y="${H-6}" text-anchor="middle">${d.hourly?dt.getHours()+'h':(dt.getMonth()+1)+'/'+dt.getDate()}</text>`; }
+  });
+  svg.innerHTML = g;
+}
+
+function renderLimit(d){
+  const el = $('limit-body');
+  if(CAL && !CAL.h5 && CAL.week){ el.innerHTML = `<div>Weekly limit: 1% ≈ ${money(1/CAL.week.pctPerDollar)} equivalent · calibrated ${when(CAL.calibratedAt)}. Add the 5-hour numbers to track the current window.</div>`; return; }
+  if(!CAL || !CAL.h5){ el.innerHTML = '<div class="s">Not calibrated. Open "Calibrate" and copy the numbers from the Claude app usage card to see costs as a % of your plan limits.</div>'; return; }
+  let h = d.window5h
+    ? `<div>Current 5-hour window: <b>≈ ${pctTxt(p5raw(d.window5h.spent))}</b> used (${money(d.window5h.spent)} equivalent) · resets ${when(d.window5h.reset)}</div>
+       <div class="meter"><i style="width:${Math.min(100,p5raw(d.window5h.spent))}%"></i></div>`
+    : `<div>The calibrated 5-hour window has reset: calibrate again to track the current one.</div>`;
+  h += `<div class="s">1% of 5 h ≈ ${money(1/CAL.h5.pctPerDollar)}${CAL.week ? ' · 1% of weekly ≈ '+money(1/CAL.week.pctPerDollar) : ''} · calibrated ${when(CAL.calibratedAt)}. Estimate only: the app rounds percentages and does not publish its formula.</div>`;
+  el.innerHTML = h;
+}
+
+function render(d){
+  last = d; CAL = d.cal;
+  $('k-total').textContent = fmt(used(d.total));
+  $('k-out').textContent = fmt(d.total.out);
+  $('k-out-s').textContent = 'new input: '+fmt(d.total.inp)+' · cache writes: '+fmt(d.total.cw);
+  $('k-cr').textContent = fmt(d.total.cr);
+  $('k-cost').textContent = money(d.total.cost);
+  $('k-cost-s').textContent = !CAL ? 'at API list prices'
+    : (p5(d.total.cost) != null ? '≈ '+pctTxt(p5(d.total.cost))+' of 5-hour limit · ' : '≈ ') + pctTxt(pW(d.total.cost))+' of weekly limit';
+  $('k-last').textContent = d.total.calls.toLocaleString()+' responses · last '+ago(d.lastTs);
+  $('foot').textContent = 'Read from local Claude Code transcripts; nothing leaves this computer. Costs use API list prices verified on '+d.pricingVerifiedAt+' (edit pricing.json to update).';
+  renderLimit(d);
+  const ag = Object.entries(d.byAgent).sort((a,b)=>{const ia=ORDER.indexOf(a[0]),ib=ORDER.indexOf(b[0]);return (ia<0?9:ia)-(ib<0?9:ib)||used(b[1])-used(a[1])});
+  rows($('agents'), ag, (k,v)=>{
+    const warn = v.overTier ? ` · <span class="warn">⚠ ${v.overTier} calls over the 100k tier</span>` : '';
+    return [AGENT_LABEL[k]||k, esc((AGENT_ROLE[k]?AGENT_ROLE[k]+' · ':'')+v.models.join(', ')+' · '+costLine(v.cost)+' · max context '+fmt(v.maxPrompt))+warn, col(v.models[0])];
+  });
+  rows($('models'), Object.entries(d.byFamily).sort((a,b)=>used(b[1])-used(a[1])),
+    (k,v)=>[k, esc(v.calls.toLocaleString()+' responses · '+costLine(v.cost))+(v.overTier?` · <span class="warn">⚠ ${v.overTier} over 100k (5× price)</span>`:''), col(k)]);
+  chart(d);
+  $('sessions').innerHTML = d.sessions.length ? d.sessions.map(s=>`<tr>
+    <td>${esc(s.title||s.id)}<small>${esc(s.project)} · ${ago(s.lastTs)}</small>${s.agents.filter(a=>a!=='main').map(a=>`<span class="tag">${esc(a)}</span>`).join('')}</td>
+    <td>${fmt(used(s))}</td><td>${fmt(s.out)}</td><td>${fmt(s.cr)}</td><td>${money(s.cost)}</td><td>${pctTxt(p5(s.cost))}</td><td>${pctTxt(pW(s.cost))}</td></tr>`).join('')
+    : '<tr><td colspan="7" class="empty">No sessions in this range</td></tr>';
+}
+
+let inflight = null;
+async function load(){
+  inflight?.abort(); inflight = new AbortController();
+  try{ const r = await fetch('/api/stats?range='+range,{signal:inflight.signal}); render(await r.json()); }
+  catch(e){ if(e.name!=='AbortError') console.error(e); }
+}
+function setRange(r){
+  range = r; try{localStorage.setItem('tm-range',r)}catch{}
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('act',b.dataset.r===r));
+  load();
+}
+const post = (url, body) => fetch(url,{method:'POST',headers:{'Content-Type':'application/json','X-Token-Monitor':'1'},body:JSON.stringify(body||{})}).then(r=>r.json());
+
+$('tabs').addEventListener('click',e=>{ if(e.target.dataset.r) setRange(e.target.dataset.r); });
+$('xls').addEventListener('click', async ()=>{
+  const b = $('xls'); b.disabled = true; b.textContent = 'Exporting…';
+  try{ const r = await post('/api/export'); b.textContent = r.ok ? 'Exported ✓' : 'Export failed'; b.title = r.msg; }
+  catch{ b.textContent = 'Export failed'; }
+  setTimeout(()=>{ b.disabled = false; b.textContent = 'Export Excel'; }, 3000);
+});
+$('calf').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const body = {};
+  for(const [k,v] of new FormData(e.target)){ if(v) body[k] = k.endsWith('Reset') ? new Date(v).toISOString() : v; }
+  await post('/api/calibrate', body);
+  e.target.closest('details').open = false;
+  load();
+});
+setRange(range);
+const es = new EventSource('/events');
+es.addEventListener('update', load);
+es.onopen = ()=>{ $('dot').classList.add('on'); $('st').textContent='Live'; };
+es.onerror = ()=>{ $('dot').classList.remove('on'); $('st').textContent='Disconnected'; };
+setInterval(()=>{ if(last) $('k-last').textContent=last.total.calls.toLocaleString()+' responses · last '+ago(last.lastTs); }, 15000);
+addEventListener('resize', ()=>{ if(last) chart(last); });
+</script>
+</body>
+</html>
