@@ -25,9 +25,20 @@ Haiku is around 40× cheaper per token than Opus, but only if each call stays sm
 
 ## Install the skill and agents
 
+macOS / Linux:
+
 ```bash
-git clone https://github.com/<you>/claude-orchestra && cd claude-orchestra
-./install.sh            # or on Windows: .\install.ps1
+git clone https://github.com/xzsinma/claude-orchestra.git
+cd claude-orchestra
+sh install.sh
+```
+
+Windows (PowerShell):
+
+```powershell
+git clone https://github.com/xzsinma/claude-orchestra.git
+cd claude-orchestra
+powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
 Files go to `~/.claude/skills/orchestra` and `~/.claude/agents/`. Existing files are never overwritten unless you pass `--force` / `-Force`; `--dry-run` / `-DryRun` shows what would happen. Start a new Claude Code session afterwards and say *"use the orchestra"*, or just start a build task.
@@ -36,20 +47,37 @@ Files go to `~/.claude/skills/orchestra` and `~/.claude/agents/`. Existing files
 
 ### With Node (simplest)
 
-Requires Node.js 18+. Python 3 with `openpyxl` is only needed for the Excel export.
+Requires Node.js 22+. From the `claude-orchestra` folder:
 
 ```bash
-cd token-monitor
-node server.js          # http://127.0.0.1:4317
+node token-monitor/server.js
+```
+
+Then open http://127.0.0.1:4317. It reads `~/.claude/projects` (where Claude Code keeps its transcripts) and updates live.
+
+The **Export Excel** button needs Python 3 with `openpyxl`:
+
+```bash
+pip install openpyxl
+```
+
+### Try it with fake data
+
+Not using Claude Code yet, or want to see it without your own data:
+
+```bash
+node token-monitor/server.js --demo
 ```
 
 ### With Docker (isolated)
 
+Requires [Docker](https://docs.docker.com/get-docker/). From the `claude-orchestra` folder:
+
 ```bash
-cd token-monitor
-cp .env.example .env    # set CLAUDE_PROJECTS_DIR to your ~/.claude/projects folder
-docker compose up -d    # http://127.0.0.1:4317
+docker compose -f token-monitor/compose.yaml up -d --build
 ```
+
+Then open http://127.0.0.1:4317. It mounts `~/.claude/projects` read-only; to use another folder or set your time zone, copy `token-monitor/.env.example` to `token-monitor/.env` and edit it. Stop it with `docker compose -f token-monitor/compose.yaml down`. Excel exports land in `token-monitor/out/`.
 
 The container is hardened by default:
 
@@ -59,14 +87,6 @@ The container is hardened by default:
 - strict security headers (CSP, `X-Frame-Options: DENY`, no CORS), memory and process limits.
 
 CI builds the image and checks all of the above on every push.
-
-### Try it with fake data
-
-```bash
-cd token-monitor
-node demo/generate.js /tmp/claude-demo
-TOKEN_MONITOR_ROOT=/tmp/claude-demo node server.js
-```
 
 ### Configuration
 
@@ -94,9 +114,16 @@ Costs use API list prices from [`token-monitor/pricing.json`](token-monitor/pric
 
 ## Development
 
+Unit and HTTP security tests:
+
 ```bash
-node --test token-monitor/test/*.test.js        # unit + HTTP security tests
-python token-monitor/export_excel.py out.xlsx   # needs: pip install openpyxl
+node --test "token-monitor/test/*.test.js"
+```
+
+Build the Excel workbook without the dashboard (writes `out/token-usage.xlsx`):
+
+```bash
+python token-monitor/export_excel.py
 ```
 
 ## License

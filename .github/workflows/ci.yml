@@ -20,7 +20,11 @@ jobs:
           python-version: '3.12'
       - run: pip install openpyxl==3.1.5
       - name: Unit tests
-        run: node --test token-monitor/test/*.test.js
+        run: node --test "token-monitor/test/*.test.js"
+      - name: Demo mode starts
+        run: |
+          node token-monitor/server.js --demo &
+          for i in $(seq 1 20); do curl -fs http://127.0.0.1:4317/api/stats?range=all | grep -q '"junior-haiku"' && exit 0; sleep 1; done; exit 1
       - name: Excel export from demo data
         working-directory: token-monitor
         run: |
@@ -44,6 +48,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22.11.0'
+      - name: Compose file works with no .env
+        run: docker compose -f token-monitor/compose.yaml config --quiet
       - name: Build image
         run: docker build -t token-monitor:ci token-monitor
       - name: Run hardened container on demo data

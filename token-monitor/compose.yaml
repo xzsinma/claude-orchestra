@@ -1,5 +1,5 @@
 # docker compose up -d   ->   http://127.0.0.1:4317
-# Copy .env.example to .env and set CLAUDE_PROJECTS_DIR to your transcripts folder.
+# Reads ~/.claude/projects by default. To change it (or your time zone), copy .env.example to .env.
 services:
   token-monitor:
     build: .
@@ -11,7 +11,8 @@ services:
     environment:
       TZ: ${TZ:-UTC}
     volumes:
-      - ${CLAUDE_PROJECTS_DIR:?set CLAUDE_PROJECTS_DIR in .env}:/data/projects:ro   # transcripts, read-only
+      # transcripts, read-only (HOME on macOS/Linux, USERPROFILE on Windows)
+      - ${CLAUDE_PROJECTS_DIR:-${HOME:-${USERPROFILE}}/.claude/projects}:/data/projects:ro
       - state:/state                                                               # calibration only
       - ./out:/out                                                                 # Excel exports
     read_only: true

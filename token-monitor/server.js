@@ -321,7 +321,16 @@ function createServer(monitor, opts = {}) {
 module.exports = { createMonitor, createServer, costOf, hostAllowed, CONFIG };
 
 if (require.main === module) {
-  const monitor = createMonitor();
+  if (process.argv.includes('--demo')) {
+    // Fresh fictional data in a temp folder, so the dashboard can be tried without real transcripts.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-demo-'));
+    require('./demo/generate').generate(path.join(dir, 'projects'));
+    // Also in the environment, so the Excel export (a child process) reads the demo data too.
+    CONFIG.root = process.env.TOKEN_MONITOR_ROOT = path.join(dir, 'projects');
+    CONFIG.dataDir = process.env.TOKEN_MONITOR_DATA = path.join(dir, 'state');
+    console.log('Demo mode: fictional data in ' + dir);
+  }
+  const monitor = createMonitor(CONFIG.root, CONFIG.dataDir);
   monitor.poll();
   if (process.argv.includes('--daily-json')) {
     process.stdout.write(JSON.stringify({ rows: monitor.daily(), cal: monitor.loadCal() }));
